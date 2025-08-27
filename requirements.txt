@@ -2,6 +2,7 @@ fastapi==0.115.2
 uvicorn==0.32.0
 google-cloud-vision==3.8.0
 google-cloud-firestore==2.19.0
+google-cloud-secret-manager==2.20.0
 requests==2.32.3
 beautifulsoup4==4.12.3
 requests-oauthlib==2.0.0
