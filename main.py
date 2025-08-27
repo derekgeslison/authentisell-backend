@@ -12,6 +12,17 @@ from requests_oauthlib import OAuth2Session
 import xml.etree.ElementTree as ET
 from config import settings
 import time
+from google.cloud import secretmanager
+import os
+def load_credentials():
+    client = secretmanager.SecretManagerServiceClient()
+    secret_name = "projects/authentisell/secrets/authentisell-credentials/versions/latest"
+    response = client.access_secret_version(name=secret_name)
+    credentials = response.payload.data.decode("UTF-8")
+    with open("/tmp/credentials.json", "w") as f:
+        f.write(credentials)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/tmp/credentials.json"
+load_credentials()
 
 app = FastAPI(title="AuthentiSell Backend")
 
