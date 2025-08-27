@@ -30,7 +30,7 @@ app = FastAPI(title="AuthentiSell Backend")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://authentisell-frontend-8q98b4koz-derek-geslisons-projects.vercel.app",
+        "https://authentisell-frontend-lixu1tme4-derek-geslisons-projects.vercel.app",
         "http://localhost:3000"
     ],
     allow_credentials=True,
