@@ -1,6 +1,7 @@
 import os
 import json
 from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.cloud import vision_v1 as vision, firestore
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, ResourceExhausted
@@ -14,11 +15,43 @@ import time
 
 app = FastAPI(title="AuthentiSell Backend")
 
-# Simplified auth check (mocked for MVP)
-async def verify_token(authorization: str = Header(...)):
+# CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://authentisell-frontend-8q98b4koz-derek-geslisons-projects.vercel.app",
+        "http://localhost:3000"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Simplified Authentication
+async def mock_auth(authorization: str = Header(default=None)):
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f"Received Authorization header: {authorization}")
     if authorization != "Bearer mock_token":
         raise HTTPException(status_code=401, detail="Invalid token")
-    return {"id": "mock_user", "email": "test@example.com"}
+    return {"user": "test@example.com"}
+
+# Login Request Model
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "test@example.com",
+                "password": "password123"
+            }
+        }
+
+@app.post("/auth/login")
+async def login(request: LoginRequest):
+    # Mock authentication: accept any email/password
+    return {"access_token": "mock_token", "token_type": "bearer"}
 
 # 1. IP Theft Detection
 def detect_ip_theft(image_content: bytes) -> dict:
@@ -64,14 +97,13 @@ def detect_ip_theft(image_content: bytes) -> dict:
     except Exception as e:
         return {"matches": [], "error": f"Unexpected error: {str(e)}"}
 
-async def mock_auth(authorization: str = Header(...)):
-    if authorization != "Bearer mock_token":
-        raise HTTPException(status_code=401, detail="Invalid token")
-    return {"user": "test"}
-
 @app.post("/api/scan")
 async def scan_image(file: UploadFile = File(...), user: dict = Depends(mock_auth)):
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f"Scan request received, file: {file.filename}, size: {file.size}")
     image_content = await file.read()
+    logging.info(f"Image content read: {len(image_content)} bytes")
     result = detect_ip_theft(image_content)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
@@ -88,19 +120,19 @@ def etsy_takedown(request_json: dict, listing_id: str) -> dict:
         return {"success": False, "error": "Etsy credentials missing."}
 
     oauth = OAuth2Session(client_id)
-    token = oauth.fetch_token(token_url=token_url, client_id=client_id, client_secret=client_secret, grant_type="client_credentials")
-    headers = {"Authorization": f"Bearer {token['access_token']}"}
-    body = {
-        "infringing_listing_id": listing_id,
-        "evidence": request_json["evidence"],
-        "copyrighted_work": request_json["copyright_proof"],
-        "contact_info": request_json["user_contact"],
-        "good_faith_statement": request_json["statement_good_faith"],
-        "accuracy_statement": request_json["statement_accuracy"],
-        "signature": request_json["signature"]
-    }
-
     try:
+        token = oauth.fetch_token(token_url=token_url, client_id=client_id, client_secret=client_secret, grant_type="client_credentials")
+        headers = {"Authorization": f"Bearer {token['access_token']}"}
+        body = {
+            "infringing_listing_id": listing_id,
+            "evidence": request_json["evidence"],
+            "copyrighted_work": request_json["copyright_proof"],
+            "contact_info": request_json["user_contact"],
+            "good_faith_statement": request_json["statement_good_faith"],
+            "accuracy_statement": request_json["statement_accuracy"],
+            "signature": request_json["signature"]
+        }
+
         resp = requests.post(api_url, json=body, headers=headers)
         resp.raise_for_status()
         data = resp.json()
@@ -223,7 +255,7 @@ class TakedownRequest(BaseModel):
     signature: str
 
 @app.post("/api/takedown")
-async def initiate_takedown(request: TakedownRequest, user: dict = Depends(verify_token)):
+async def initiate_takedown(request: TakedownRequest, user: dict = Depends(mock_auth)):
     result = submit_takedown(request.dict())
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
@@ -338,16 +370,12 @@ class PrivacyRequest(BaseModel):
     shop_name: str
 
 @app.post("/api/privacy")
-async def monitor_privacy(request: PrivacyRequest, user: dict = Depends(verify_token)):
+async def monitor_privacy(request: PrivacyRequest, user: dict = Depends(mock_auth)):
     result = monitor_data_exposure(request.email, request.shop_name)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     return result
 
-@app.post("/auth/login")
-async def login(email: str, password: str):
-    return {"access_token": "mock_token", "token_type": "bearer"}
-
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8080)
