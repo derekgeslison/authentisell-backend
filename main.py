@@ -32,15 +32,11 @@ logger = logging.getLogger(__name__)
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://authentisell-frontend-lixu1tme4-derek-geslisons-projects.vercel.app",
-        "http://localhost:3000"
-    ],
+    allow_origins=["https://authentisell-frontend-lixu1tme4-derek-geslisons-projects.vercel.app"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
-
 # Simplified Authentication
 async def mock_auth(authorization: str = Header(default=None)):
     import logging
