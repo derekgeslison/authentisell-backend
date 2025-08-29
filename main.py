@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google.cloud import vision_v1 as vision, firestore
 from google.api_core.exceptions import GoogleAPICallError, InvalidArgument, ResourceExhausted
+import logging
 from urllib.parse import urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
@@ -25,6 +26,8 @@ def load_credentials():
 load_credentials()
 
 app = FastAPI(title="AuthentiSell Backend")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # CORS Middleware
 app.add_middleware(
@@ -110,15 +113,20 @@ def detect_ip_theft(image_content: bytes) -> dict:
 
 @app.post("/api/scan")
 async def scan_image(file: UploadFile = File(...), user: dict = Depends(mock_auth)):
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logging.info(f"Scan request received, file: {file.filename}, size: {file.size}")
-    image_content = await file.read()
-    logging.info(f"Image content read: {len(image_content)} bytes")
-    result = detect_ip_theft(image_content)
-    if result.get("error"):
-        raise HTTPException(status_code=500, detail=result["error"])
-    return result
+    try:
+        logger.info(f"Scan request received, file: {file.filename}, size: {file.size}")
+        image_content = await file.read()
+        logger.info(f"Image content read: {len(image_content)} bytes")
+        if not image_content:
+            raise HTTPException(status_code=400, detail="Empty file")
+        result = detect_ip_theft(image_content)
+        if result.get("error"):
+            logger.error(f"Detect IP theft error: {result['error']}")
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except Exception as e:
+        logger.error(f"Scan error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
 
 # 2. DMCA Takedown
 def etsy_takedown(request_json: dict, listing_id: str) -> dict:
